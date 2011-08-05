@@ -1,0 +1,27 @@
+RSSParser
+A simple RSS parser implemented in Objective-C
+
+Sample Usage:
+
+- (IBAction)parseRSS:(id)sender {
+	RSSParser *parser = [[RSSParser alloc] init];
+	[parser setDelegate:self];
+	[parser downloadAndParseFeed:[NSURL URLWithString:@"http://www.macupdate.com/rss"]];
+}
+
+- (void)parserDidParseChannel:(NSDictionary *)channel {
+	NSLog(@"Received Channel: %@", [channel objectForKey:@"title"]);
+}
+
+- (void)parserDidParseItem:(NSDictionary *)feedItem {
+	NSLog(@"Received Story: %@", [feedItem objectForKey:@"title"]);
+	NSLog(@"With Body: %@", [feedItem objectForKey:@"description"]);
+}
+
+- (void)parserDidFinishParsing:(RSSParser *)parser {
+	[parser release];
+}
+
+- (void)errorOccurred:(NSError *)error {
+	NSLog(@"Error Occurred: %@", error);
+}
