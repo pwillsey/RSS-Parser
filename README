@@ -22,6 +22,7 @@ Sample Usage:
 	[parser release];
 }
 
-- (void)errorOccurred:(NSError *)error {
+- (void)parser:(RSSParser *)parser didEncounterError:(NSError *)error {
 	NSLog(@"Error Occurred: %@", error);
+	[parser release];
 }
