@@ -37,5 +37,5 @@
 - (void)parserDidFinishParsing:(RSSParser *)parser;
 - (void)parserDidParseChannel:(NSDictionary *)channel;
 - (void)parserDidParseItem:(NSDictionary *)feedItem;
-- (void)errorOccurred:(NSError *)error;
+- (void)parser:(RSSParser *)parser didEncounterError:(NSError *)error;
 @end
