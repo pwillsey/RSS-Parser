@@ -8,6 +8,13 @@
 
 #import "RSSParser.h"
 
+static NSString *const kItem            = @"item";
+static NSString *const kChannel         = @"channel";
+static NSString *const kTitle           = @"title";
+static NSString *const kLink            = @"link";
+static NSString *const kDescription     = @"description";
+static NSString *const kPubDate         = @"pubDate";
+
 #pragma mark Private Methods
 
 @interface RSSParser (Private)
@@ -29,22 +36,19 @@
 		[parser parse];
 		[parser release];
 	} else {
-		if ([self.delegate respondsToSelector:@selector(errorOccurred:)]) {
+		if ([self.delegate respondsToSelector:@selector(parser:didEncounterError:)]) {
 			NSMutableDictionary *errorInfo = [NSMutableDictionary dictionary];
 			[errorInfo setObject:@"Unable to create parser" forKey:@"NSLocalizedDescriptionKey"];
-			[self.delegate errorOccurred:[NSError errorWithDomain:@"com.peterwillsey.rssparser" code:2 userInfo:errorInfo]];
+			[self.delegate parser:self didEncounterError:[NSError errorWithDomain:@"com.peterwillsey.rssparser" code:2 userInfo:errorInfo]];
 		}
 	}
-	
-	[RSSData release];
-	
+		
 	[pool release];
 }
 
 @end
 
-#pragma mark -
-#pragma mark Public Methods
+#pragma mark - Public Methods
 
 @implementation RSSParser
 
@@ -62,16 +66,15 @@
 	if (rssConnection) {
 		self.RSSData = [NSMutableData data];
 	} else {
-		if ([self.delegate respondsToSelector:@selector(errorOccurred:)]) {
+		if ([self.delegate respondsToSelector:@selector(parser:didEncounterError:)]) {
 			NSMutableDictionary *errorInfo = [NSMutableDictionary dictionary];
 			[errorInfo setObject:@"Unable to create connection" forKey:@"NSLocalizedDescriptionKey"];
-			[self.delegate errorOccurred:[NSError errorWithDomain:@"com.peterwillsey.rssparser" code:1 userInfo:errorInfo]];
+			[self.delegate parser:self didEncounterError:[NSError errorWithDomain:@"com.peterwillsey.rssparser" code:1 userInfo:errorInfo]];
 		}
 	}
 }
 
-#pragma mark -
-#pragma mark NSURLConnection Delegate Methods
+#pragma mark - NSURLConnection Delegate Methods
 
 - (void)connection:(NSURLConnection *)connection didReceiveResponse:(NSURLResponse *)response {
 	[self.RSSData setLength:0];
@@ -87,35 +90,33 @@
 	[connection release];
 }
 
-- (void)connection:(NSURLConnection *)connection didFailWithError:(NSError *)error {
-	[connection release];
-	[RSSData release];
-		
-	if ([self.delegate respondsToSelector:@selector(errorOccurred:)]) {
-		[self.delegate errorOccurred:error];
+- (void)connection:(NSURLConnection *)connection didFailWithError:(NSError *)error {		
+	if ([self.delegate respondsToSelector:@selector(parser:didEncounterError:)]) {
+		[self.delegate parser:self didEncounterError:error];
 	}
 	if ([self.delegate respondsToSelector:@selector(parserDidFinishParsing:)]) {
 		[self.delegate parserDidFinishParsing:self];
 	}
+    
+	[connection release];
 }
 
-#pragma mark -
-#pragma mark NSXMLParser Delegate Methods
+#pragma mark - NSXMLParser Delegate Methods
 
 - (void)parserDidStartDocument:(NSXMLParser *)parser {
 	self.elements = [NSMutableArray array];
 }
 
 - (void)parser:(NSXMLParser *)parser parseErrorOccurred:(NSError *)parseError {	
-	if ([self.delegate respondsToSelector:@selector(errorOccurred:)]) {
-		[self.delegate errorOccurred:parseError];
+	if ([self.delegate respondsToSelector:@selector(parser:didEncounterError:)]) {
+		[self.delegate parser:self didEncounterError:parseError];
 	}
 }
 
 - (void)parser:(NSXMLParser *)parser didStartElement:(NSString *)elementName namespaceURI:(NSString *)namespaceURI qualifiedName:(NSString *)qName attributes:(NSDictionary *)attributeDict {
-	if ([[elementName lowercaseString] isEqualToString:@"item"]) {
+	if ([[elementName lowercaseString] isEqualToString:kItem]) {
 		self.currentItem = [NSMutableDictionary dictionaryWithCapacity:0];
-	} else if ([[elementName lowercaseString] isEqualToString:@"channel"]) {
+	} else if ([[elementName lowercaseString] isEqualToString:kChannel]) {
 		self.channel = [NSMutableDictionary dictionaryWithCapacity:0];
 	}
 	
@@ -127,26 +128,26 @@
 	[self.elements removeLastObject];
 	NSString *parentElement = [self.elements lastObject];
 	
-	if ([[elementName lowercaseString] isEqualToString:@"title"] && [[parentElement lowercaseString] isEqualToString:@"channel"]) {
-		[self.channel setObject:self.currentString forKey:@"title"];
-	} else if ([[elementName lowercaseString] isEqualToString:@"link"] && [[parentElement lowercaseString] isEqualToString:@"channel"]) {
-		[self.channel setObject:self.currentString forKey:@"link"];
-	} else if ([[elementName lowercaseString] isEqualToString:@"description"] && [[parentElement lowercaseString] isEqualToString:@"channel"]) {
-		[self.channel setObject:self.currentString forKey:@"description"];
-	} else if ([[elementName lowercaseString] isEqualToString:@"channel"]) {
+	if ([[elementName lowercaseString] isEqualToString:kTitle] && [[parentElement lowercaseString] isEqualToString:kChannel]) {
+		[self.channel setObject:self.currentString forKey:kTitle];
+	} else if ([[elementName lowercaseString] isEqualToString:kLink] && [[parentElement lowercaseString] isEqualToString:kChannel]) {
+		[self.channel setObject:self.currentString forKey:kLink];
+	} else if ([[elementName lowercaseString] isEqualToString:kDescription] && [[parentElement lowercaseString] isEqualToString:kChannel]) {
+		[self.channel setObject:self.currentString forKey:kDescription];
+	} else if ([[elementName lowercaseString] isEqualToString:kChannel]) {
 		if ([self.delegate respondsToSelector:@selector(parserDidParseChannel:)]) {
 			[self.delegate parserDidParseChannel:self.channel];
 		}
 		self.channel = nil;
-	} else if ([[elementName lowercaseString] isEqualToString:@"title"] && [[parentElement lowercaseString] isEqualToString:@"item"]) {
-		[self.currentItem setObject:self.currentString forKey:@"title"];
-	} else if ([[elementName lowercaseString] isEqualToString:@"link"] && [[parentElement lowercaseString] isEqualToString:@"item"]) {
-		[self.currentItem setObject:self.currentString forKey:@"link"];
-	} else if ([[elementName lowercaseString] isEqualToString:@"description"] && [[parentElement lowercaseString] isEqualToString:@"item"]) {
-		[self.currentItem setObject:self.currentString forKey:@"description"];
-	} else if ([[elementName lowercaseString] isEqualToString:@"pubDate"] && [[parentElement lowercaseString] isEqualToString:@"item"]) {
-		[self.currentItem setObject:self.currentString forKey:@"pubDate"];
-	} else if ([[elementName lowercaseString] isEqualToString:@"item"]) {
+	} else if ([[elementName lowercaseString] isEqualToString:kTitle] && [[parentElement lowercaseString] isEqualToString:kItem]) {
+		[self.currentItem setObject:self.currentString forKey:kTitle];
+	} else if ([[elementName lowercaseString] isEqualToString:kLink] && [[parentElement lowercaseString] isEqualToString:kItem]) {
+		[self.currentItem setObject:self.currentString forKey:kLink];
+	} else if ([[elementName lowercaseString] isEqualToString:kDescription] && [[parentElement lowercaseString] isEqualToString:kItem]) {
+		[self.currentItem setObject:self.currentString forKey:kDescription];
+	} else if ([[elementName lowercaseString] isEqualToString:kPubDate] && [[parentElement lowercaseString] isEqualToString:kItem]) {
+		[self.currentItem setObject:self.currentString forKey:kPubDate];
+	} else if ([[elementName lowercaseString] isEqualToString:kItem]) {
 		if ([self.delegate respondsToSelector:@selector(parserDidParseItem:)]) {
 			[self.delegate parserDidParseItem:self.currentItem];
 		}
@@ -169,13 +170,19 @@
 	if ([self.delegate respondsToSelector:@selector(parserDidFinishParsing:)]) {
 		[self.delegate parserDidFinishParsing:self];
 	}
-	[elements release];
 }
 
-#pragma mark -
-#pragma mark Clean Up
+#pragma mark - Clean Up
 
-- (void)dealloc {	
+- (void)dealloc {
+	delegate = nil;
+    
+	[RSSData release];
+	[currentString release];
+	[channel release];
+	[currentItem release];
+	[elements release];
+    
 	[super dealloc];
 }
 
